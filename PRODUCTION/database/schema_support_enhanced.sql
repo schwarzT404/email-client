@@ -4,7 +4,44 @@
 -- =======================================================
 
 -- =======================================================
--- 1. BASE DE CONNAISSANCES "RÉPONSES SUPPORT"
+-- 1. GESTION DES COMMANDES & PRODUITS
+-- =======================================================
+
+CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    price REAL NOT NULL,
+    stock INTEGER NOT NULL DEFAULT 0,
+    image_url TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_uid TEXT NOT NULL UNIQUE, -- ID visible par le client
+    client_email TEXT NOT NULL,
+    order_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    total_amount REAL NOT NULL,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled'))
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    quantity INTEGER NOT NULL,
+    price_at_purchase REAL NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(id),
+    FOREIGN KEY (product_id) REFERENCES products(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
+CREATE INDEX IF NOT EXISTS idx_orders_client_email ON orders(client_email);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+
+-- =======================================================
+-- 2. BASE DE CONNAISSANCES "RÉPONSES SUPPORT"
 -- =======================================================
 
 CREATE TABLE IF NOT EXISTS support_responses (
@@ -23,14 +60,14 @@ CREATE INDEX IF NOT EXISTS idx_support_responses_categorie ON support_responses(
 CREATE INDEX IF NOT EXISTS idx_support_responses_active ON support_responses(is_active);
 
 -- =======================================================
--- 2. BASE DE GESTION DES ÉCHANGES "CONTACTS CLIENTS"
+-- 3. BASE DE GESTION DES ÉCHANGES "CONTACTS CLIENTS"
 -- =======================================================
 
 CREATE TABLE IF NOT EXISTS contacts_clients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email_client TEXT NOT NULL,
     nom_prenom TEXT,
-    id_commande INTEGER,
+    order_id INTEGER, -- Remplacé par order_uid pour correspondre à la nouvelle table
     message_initial TEXT NOT NULL,
     categorie TEXT,
     reponse_personnalisee TEXT,
@@ -67,7 +104,7 @@ CREATE INDEX IF NOT EXISTS idx_contacts_created ON contacts_clients(created_at);
 CREATE INDEX IF NOT EXISTS idx_contacts_ticket ON contacts_clients(ticket_id);
 
 -- =======================================================
--- 3. TABLE HISTORIQUE DES INTERACTIONS
+-- 4. TABLE HISTORIQUE DES INTERACTIONS
 -- =======================================================
 
 CREATE TABLE IF NOT EXISTS interactions_history (
@@ -83,7 +120,7 @@ CREATE TABLE IF NOT EXISTS interactions_history (
 );
 
 -- =======================================================
--- 4. TABLE NOTION INTEGRATION
+-- 5. TABLE NOTION INTEGRATION
 -- =======================================================
 
 CREATE TABLE IF NOT EXISTS notion_integration (
@@ -99,7 +136,7 @@ CREATE TABLE IF NOT EXISTS notion_integration (
 );
 
 -- =======================================================
--- 5. TRIGGERS AUTOMATIQUES
+-- 6. TRIGGERS AUTOMATIQUES
 -- =======================================================
 
 -- Trigger pour mettre à jour updated_at sur contacts_clients
@@ -128,7 +165,7 @@ BEGIN
 END;
 
 -- =======================================================
--- 6. DONNÉES INITIALES - RÉPONSES SUPPORT
+-- 7. DONNÉES INITIALES - RÉPONSES SUPPORT
 -- =======================================================
 
 INSERT OR REPLACE INTO support_responses (id, categorie, reponse_generique, tags, variables_template) VALUES
@@ -158,7 +195,7 @@ INSERT OR REPLACE INTO support_responses (id, categorie, reponse_generique, tags
  '{"nom_client": "string", "objet_reclamation": "string", "action_corrective": "string"}');
 
 -- =======================================================
--- 7. VUES UTILES POUR REPORTING
+-- 8. VUES UTILES POUR REPORTING
 -- =======================================================
 
 -- Vue pour les statistiques par catégorie

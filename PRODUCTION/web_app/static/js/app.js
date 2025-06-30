@@ -1,23 +1,24 @@
-// Variables globales
+// =================================================================================
+// INITIALISATION ET VARIABLES GLOBALES
+// =================================================================================
 let isProcessing = false;
+let cart = [];
 
-// Initialisation
 document.addEventListener('DOMContentLoaded', function() {
-    loadExamples();
+    // Initialisation des listeners et des données
+    document.getElementById('support-form').addEventListener('submit', processMessage);
     updateSystemStatus();
-    
-    // Actualiser le statut toutes les 30 secondes
+    loadProducts();
     setInterval(updateSystemStatus, 30000);
 });
 
-// Gestion du formulaire
-document.getElementById('message-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    processMessage();
-});
 
-// Traitement du message
-async function processMessage() {
+// =================================================================================
+// PARTIE 1 : TRAITEMENT DES MESSAGES DE SUPPORT (Formulaire principal)
+// =================================================================================
+
+async function processMessage(e) {
+    if (e) e.preventDefault();
     if (isProcessing) return;
     
     const email = document.getElementById('email').value.trim();
@@ -25,7 +26,7 @@ async function processMessage() {
     const message = document.getElementById('message').value.trim();
     
     if (!email || !message) {
-        showToast('Erreur', 'Email et message requis', 'danger');
+        showToast('Erreur', 'Email et message sont requis.', 'danger');
         return;
     }
     
@@ -35,337 +36,293 @@ async function processMessage() {
     try {
         const response = await fetch('/api/process-message', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, subject, message })
         });
-        
         const data = await response.json();
-        
         if (data.success) {
             displayResult(data.result);
-            showToast('Succès', 'Message traité avec succès', 'success');
+            showToast('Succès', 'Message traité avec succès.', 'success');
         } else {
             showError('Erreur: ' + data.error);
-            showToast('Erreur', data.error, 'danger');
         }
-        
     } catch (error) {
         showError('Erreur de connexion: ' + error.message);
-        showToast('Erreur', 'Erreur de connexion', 'danger');
     } finally {
         isProcessing = false;
     }
 }
 
-// Afficher le résultat
 function displayResult(result) {
     const resultArea = document.getElementById('result-area');
     resultArea.className = 'result-area has-content animate__animated animate__fadeIn';
-    
     resultArea.innerHTML = `
-        <div class="row g-3">
-            <div class="col-12">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="text-primary mb-0"><i class="bi bi-check-circle-fill"></i> Traitement Terminé</h6>
-                    <span class="badge bg-success">${result.category}</span>
-                </div>
-            </div>
-            
-            <div class="col-md-6">
-                <small class="text-muted">Email Client</small>
-                <div class="fw-bold">${result.email}</div>
-            </div>
-            
-            <div class="col-md-6">
-                <small class="text-muted">Score de Qualité</small>
-                <div class="fw-bold text-success">${(result.quality_score * 100).toFixed(1)}%</div>
-            </div>
-            
-            <div class="col-12">
-                <small class="text-muted">Réponse Générée</small>
-                <div class="bg-light p-3 rounded-3 mt-1" style="white-space: pre-line; max-height: 200px; overflow-y: auto;">
-                    ${result.response}
-                </div>
-            </div>
-            
-            <div class="col-12">
-                <small class="text-muted">Ticket ID</small>
-                <div class="fw-bold text-info">${result.ticket_id}</div>
-            </div>
-            
-            <div class="col-12 mt-3">
-                <button class="btn btn-outline-primary btn-sm" onclick="copyResponse()">
-                    <i class="bi bi-clipboard"></i> Copier la Réponse
-                </button>
-            </div>
-        </div>
-    `;
-    
-    // Stocker la réponse pour la copie
+        <h6 class="text-primary"><i class="bi bi-check-circle-fill"></i> Traitement Terminé</h6>
+        <p><strong>Catégorie :</strong> <span class="badge bg-success">${result.category}</span></p>
+        <p><strong>Réponse suggérée :</strong></p>
+        <div class="bg-light p-2 rounded">${result.response}</div>
+        <small class="text-muted">Ticket ID: ${result.ticket_id}</small>`;
     window.lastResponse = result.response;
 }
 
-// Afficher l'état de chargement
 function showLoading() {
     const resultArea = document.getElementById('result-area');
     resultArea.className = 'result-area';
-    resultArea.innerHTML = `
-        <div class="text-center">
-            <div class="loading-spinner"></div>
-            <p class="mt-3 text-primary">Traitement en cours...</p>
-            <small class="text-muted">Classification et génération de réponse</small>
-        </div>
-    `;
+    resultArea.innerHTML = `<div class="text-center"><div class="loading-spinner"></div><p class="mt-2">Traitement en cours...</p></div>`;
 }
 
-// Afficher une erreur
 function showError(message) {
     const resultArea = document.getElementById('result-area');
     resultArea.className = 'result-area';
-    resultArea.innerHTML = `
-        <div class="text-center text-danger">
-            <i class="bi bi-exclamation-triangle" style="font-size: 3rem;"></i>
-            <p class="mt-3 fw-bold">Erreur de Traitement</p>
-            <p class="text-muted">${message}</p>
-        </div>
-    `;
+    resultArea.innerHTML = `<div class="text-center text-danger"><i class="bi bi-exclamation-triangle"></i><p>${message}</p></div>`;
 }
 
-// Charger les statistiques
-async function loadStatistics() {
-    const statsContent = document.getElementById('stats-content');
-    statsContent.innerHTML = `
-        <div class="text-center">
-            <div class="loading-spinner"></div>
-            <p class="mt-3">Chargement des statistiques...</p>
-        </div>
-    `;
+// =================================================================================
+// PARTIE 2 : GESTION DES COMMANDES (Section produits/panier)
+// =================================================================================
+
+async function loadProducts() {
+    console.time("Diagnostic - Temps total de chargement des produits");
+    // Note : On ne vide plus la section, le squelette est déjà là.
     
     try {
-        const response = await fetch('/api/statistics');
+        const response = await fetch('/api/products');
         const data = await response.json();
-        
         if (data.success) {
-            displayStatistics(data.stats);
+            displayProducts(data.products);
         } else {
-            statsContent.innerHTML = `
-                <div class="text-center text-danger">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <p>Erreur de chargement: ${data.error}</p>
-                </div>
-            `;
-        }
-    } catch (error) {
-        statsContent.innerHTML = `
-            <div class="text-center text-danger">
-                <i class="bi bi-wifi-off"></i>
-                <p>Erreur de connexion</p>
-            </div>
-        `;
-    }
-}
-
-// Afficher les statistiques
-function displayStatistics(stats) {
-    const statsContent = document.getElementById('stats-content');
-    
-    statsContent.innerHTML = `
-        <div class="row g-4">
-            <div class="col-md-3">
-                <div class="stats-card animate__animated animate__fadeInUp">
-                    <i class="bi bi-people-fill" style="font-size: 2rem;"></i>
-                    <h3 class="mt-2">${stats.nb_clients}</h3>
-                    <p class="mb-0">Clients</p>
-                </div>
-            </div>
-            
-            <div class="col-md-3">
-                <div class="stats-card animate__animated animate__fadeInUp" style="animation-delay: 0.1s;">
-                    <i class="bi bi-cart-fill" style="font-size: 2rem;"></i>
-                    <h3 class="mt-2">${stats.nb_commandes}</h3>
-                    <p class="mb-0">Commandes</p>
-                </div>
-            </div>
-            
-            <div class="col-md-3">
-                <div class="stats-card animate__animated animate__fadeInUp" style="animation-delay: 0.2s;">
-                    <i class="bi bi-currency-euro" style="font-size: 2rem;"></i>
-                    <h3 class="mt-2">${stats.ca_total.toFixed(0)}€</h3>
-                    <p class="mb-0">Chiffre d'Affaires</p>
-                </div>
-            </div>
-            
-            <div class="col-md-3">
-                <div class="stats-card animate__animated animate__fadeInUp" style="animation-delay: 0.3s;">
-                    <i class="bi bi-basket-fill" style="font-size: 2rem;"></i>
-                    <h3 class="mt-2">${stats.panier_moyen.toFixed(0)}€</h3>
-                    <p class="mb-0">Panier Moyen</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="row mt-5">
-            <div class="col-12">
-                <div class="card card-modern">
-                    <div class="card-body">
-                        <h5 class="card-title"><i class="bi bi-trophy-fill text-warning"></i> Top Clients</h5>
-                        <div class="row">
-                            ${stats.top_clients.map((client, index) => `
-                                <div class="col-md-4 mb-3">
-                                    <div class="d-flex align-items-center">
-                                        <div class="badge bg-primary rounded-pill me-3">${index + 1}</div>
-                                        <div>
-                                            <div class="fw-bold">${client.prenom} ${client.nom}</div>
-                                            <small class="text-muted">${client.nb_commandes} commandes</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// Charger les exemples
-async function loadExamples() {
-    try {
-        const response = await fetch('/api/examples');
-        const data = await response.json();
-        
-        if (data.success) {
-            displayExamples(data.examples);
-        }
-    } catch (error) {
-        console.error('Erreur de chargement des exemples:', error);
-    }
-}
-
-// Afficher les exemples
-function displayExamples(examples) {
-    const examplesContent = document.getElementById('examples-content');
-    
-    examplesContent.innerHTML = `
-        <div class="row g-3">
-            ${examples.map(example => `
-                <div class="col-md-6">
-                    <div class="card example-card" onclick="loadExample(${example.id})">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h6 class="card-title mb-0">${example.subject}</h6>
-                                <span class="badge bg-secondary">${example.category}</span>
-                            </div>
-                            <p class="text-muted small mb-2">${example.email}</p>
-                            <p class="card-text">${example.message.substring(0, 100)}...</p>
-                            <small class="text-primary"><i class="bi bi-hand-index"></i> Cliquer pour utiliser</small>
-                        </div>
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
-
-// Charger un exemple
-function loadExample(exampleId) {
-    fetch('/api/examples')
-        .then(response => response.json())
-        .then(data => {
-            const example = data.examples.find(ex => ex.id === exampleId);
-            if (example) {
-                document.getElementById('email').value = example.email;
-                document.getElementById('subject').value = example.subject;
-                document.getElementById('message').value = example.message;
-                
-                // Revenir à l'onglet traitement
-                document.getElementById('process-tab').click();
-                
-                showToast('Exemple chargé', 'Les données ont été remplies automatiquement', 'info');
+            const productList = document.getElementById('product-list-container');
+            if (productList) {
+                productList.innerHTML = '<p class="text-danger">Erreur de chargement des produits.</p>';
             }
-        });
+        }
+    } catch (error) {
+        const productList = document.getElementById('product-list-container');
+        if (productList) {
+            productList.innerHTML = '<p class="text-danger">Erreur de connexion.</p>';
+        }
+    } finally {
+        console.timeEnd("Diagnostic - Temps total de chargement des produits");
+    }
 }
 
-// Mettre à jour le statut du système
+function displayProducts(products) {
+    const productList = document.getElementById('product-list-container'); // Un nouvel ID pour le conteneur des produits
+    if (!productList) return;
+    
+    productList.innerHTML = products.map(p => `
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                    <div class="card-body">
+                    <h6 class="card-title">${p.name}</h6>
+                    <div class="d-flex justify-content-between">
+                        <span class="fw-bold text-primary">${p.price.toFixed(2)}€</span>
+                        <span class="badge bg-${p.stock > 0 ? 'success' : 'danger'}">${p.stock > 0 ? `Stock: ${p.stock}` : 'Rupture'}</span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary mt-2" onclick="addToCart(${p.id}, '${p.name}', ${p.price})" ${p.stock === 0 ? 'disabled' : ''}>
+                        <i class="bi bi-cart-plus"></i> Ajouter
+                    </button>
+                </div>
+            </div>
+        </div>`).join('');
+}
+
+
+function addToCart(id, name, price) {
+    const existingItem = cart.find(item => item.id === id);
+    if (existingItem) {
+        existingItem.quantity++;
+    } else {
+        cart.push({ id, name, price, quantity: 1 });
+    }
+    updateCart();
+}
+
+function updateCart() {
+    const cartItemsDiv = document.getElementById('cart-items');
+    const cartTotalDiv = document.getElementById('cart-total');
+    const checkoutBtn = document.getElementById('checkout-btn');
+
+    if (cart.length === 0) {
+        cartItemsDiv.innerHTML = '<p class="text-muted">Panier vide.</p>';
+        cartTotalDiv.innerHTML = '';
+        checkoutBtn.disabled = true;
+    } else {
+        cartItemsDiv.innerHTML = cart.map(item => `
+            <div class="d-flex justify-content-between">
+                <span>${item.name} x${item.quantity}</span>
+                <span>${(item.price * item.quantity).toFixed(2)}€</span>
+            </div>`).join('');
+        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        cartTotalDiv.innerHTML = `<strong>Total: ${total.toFixed(2)}€</strong>`;
+        checkoutBtn.disabled = false;
+    }
+}
+
+async function checkout() {
+    const email = document.getElementById('order-email').value.trim();
+    if (!email) {
+        showToast('Erreur', 'Veuillez renseigner un email pour la commande.', 'danger');
+        return;
+    }
+    const emailExists = await checkEmail(email);
+    if (emailExists) {
+        await proceedToOrder(email);
+    } else {
+        const registerModal = new bootstrap.Modal(document.getElementById('registerModal'));
+        document.getElementById('register-email').value = email;
+        registerModal.show();
+    }
+}
+
+async function checkEmail(email) {
+    try {
+        const response = await fetch('/api/check-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const data = await response.json();
+        return data.exists;
+    } catch (e) { return false; }
+}
+
+async function submitRegistration() {
+    const email = document.getElementById('register-email').value;
+    const prenom = document.getElementById('register-prenom').value.trim();
+    const nom = document.getElementById('register-nom').value.trim();
+
+    if (!prenom || !nom) {
+        showToast('Erreur', 'Nom et prénom requis.', 'warning');
+        return;
+    }
+
+    const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, prenom, nom })
+    });
+    const data = await response.json();
+
+    if (data.success) {
+        showToast('Succès', 'Inscription réussie !', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('registerModal')).hide();
+        await proceedToOrder(email);
+    } else {
+        showToast('Erreur', data.error || "L'inscription a échoué.", 'danger');
+    }
+}
+
+async function proceedToOrder(email) {
+    if (cart.length === 0) {
+        showToast('Info', 'Votre panier est vide.', 'warning');
+        return;
+    }
+    try {
+        const response = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, cart })
+        });
+        const data = await response.json();
+        if (data.success) {
+            showToast('Commande validée !', `ID: ${data.order_uid}`, 'success');
+            simulateDelivery(data.order_uid);
+            cart = [];
+            updateCart();
+            document.getElementById('order-email').value = '';
+        } else {
+            showToast('Erreur de commande', data.error, 'danger');
+    }
+    } catch (e) {
+        showToast('Erreur', 'Impossible de passer la commande.', 'danger');
+    }
+}
+
+function simulateDelivery(orderUid) {
+    const orderSection = document.getElementById('order-section');
+    const deliveryTime = Math.floor(Math.random() * 31) + 10;
+    let remaining = deliveryTime;
+    orderSection.innerHTML = `
+        <div class="text-center p-4">
+            <h4>🚚 Livraison en cours...</h4>
+            <p>Commande <strong>${orderUid}</strong>. Arrivée dans <span id="delivery-timer">${remaining}</span>s.</p>
+            <div class="progress"><div id="delivery-progress" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%;"></div></div>
+        </div>`;
+    const timer = setInterval(() => {
+        remaining--;
+        const progress = ((deliveryTime - remaining) / deliveryTime) * 100;
+        document.getElementById('delivery-timer').innerText = remaining;
+        document.getElementById('delivery-progress').style.width = `${progress}%`;
+        if (remaining <= 0) {
+            clearInterval(timer);
+            orderSection.innerHTML = `
+                <div class="text-center p-4">
+                    <h4>✅ Commande ${orderUid} livrée !</h4>
+                    <button class="btn btn-primary" onclick="reloadOrderSection()">Nouvelle Commande</button>
+                </div>`;
+        }
+    }, 1000);
+}
+
+function reloadOrderSection() {
+    // Recharge l'HTML initial de la section commande et les produits
+    const orderSection = document.getElementById('order-section');
+    orderSection.innerHTML = `
+        <div class="row">
+            <div class="col-lg-8" id="product-list-container"></div>
+            <div class="col-lg-4">
+                <h5><i class="bi bi-basket-fill"></i> Panier</h5>
+                <div class="mb-3">
+                    <label for="order-email" class="form-label fw-bold"><i class="bi bi-at"></i> Email</label>
+                    <input type="email" class="form-control" id="order-email">
+                </div>
+                <div id="cart-items"><p class="text-muted">Panier vide.</p></div>
+                <div id="cart-total" class="fw-bold fs-5 mb-3"></div>
+                <button class="btn btn-gradient w-100" id="checkout-btn" onclick="checkout()" disabled>Valider</button>
+        </div>
+        </div>`;
+    loadProducts();
+}
+
+
+// =================================================================================
+// PARTIE 3 : FONCTIONS UTILITAIRES
+// =================================================================================
+
 async function updateSystemStatus() {
     try {
         const response = await fetch('/api/status');
-        const status = await response.json();
-        
-        const indicator = document.querySelector('.status-indicator');
-        const text = document.querySelector('.navbar-text');
-        
-        if (status.agent_ready) {
-            indicator.className = 'status-indicator status-connected';
-            text.innerHTML = `
-                <span class="status-indicator status-connected"></span>
-                Système Actif
-            `;
-        } else {
-            indicator.className = 'status-indicator status-disconnected';
-            text.innerHTML = `
-                <span class="status-indicator status-disconnected"></span>
-                Système Inactif
-            `;
+        const data = await response.json();
+        const indicator = document.querySelector('.status-indicator.claude-status'); // Utiliser une classe spécifique
+        if (indicator) {
+            indicator.classList.toggle('status-connected', data.agent_ready);
+            indicator.classList.toggle('status-disconnected', !data.agent_ready);
         }
-    } catch (error) {
-        console.error('Erreur de statut:', error);
-    }
+    } catch (e) { console.error('Erreur de statut'); }
 }
 
-// Fonctions utilitaires
 function clearForm() {
-    document.getElementById('message-form').reset();
-    const resultArea = document.getElementById('result-area');
-    resultArea.className = 'result-area';
-    resultArea.innerHTML = `
-        <div class="text-center text-muted">
-            <i class="bi bi-robot" style="font-size: 3rem; opacity: 0.3;"></i>
-            <p class="mt-3">Prêt à traiter votre message...</p>
-        </div>
-    `;
+    document.getElementById('support-form').reset();
+    document.getElementById('result-area').innerHTML = '<div class="text-center text-muted"><i class="bi bi-robot" style="font-size: 2rem;"></i><p>Prêt...</p></div>';
 }
 
 function copyResponse() {
     if (window.lastResponse) {
-        navigator.clipboard.writeText(window.lastResponse).then(() => {
-            showToast('Copié', 'Réponse copiée dans le presse-papiers', 'success');
-        });
+        navigator.clipboard.writeText(window.lastResponse).then(() => showToast('Succès', 'Réponse copiée !', 'success'));
     }
-}
-
-function scrollToTop() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function showToast(title, message, type = 'info') {
     const toastContainer = document.querySelector('.toast-container');
     const toastId = 'toast-' + Date.now();
-    
     const toastHTML = `
-        <div class="toast" id="${toastId}" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="toast-header">
-                <i class="bi bi-${type === 'success' ? 'check-circle-fill text-success' : 
-                                 type === 'danger' ? 'exclamation-triangle-fill text-danger' : 
-                                 type === 'warning' ? 'exclamation-triangle-fill text-warning' : 
-                                 'info-circle-fill text-info'}"></i>
-                <strong class="me-auto ms-2">${title}</strong>
-                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-            <div class="toast-body">${message}</div>
-        </div>
-    `;
-    
+        <div class="toast align-items-center text-bg-${type} border-0" role="alert" id="${toastId}">
+            <div class="d-flex"><div class="toast-body"><strong>${title}</strong><br>${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>
+        </div>`;
     toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-    
-    const toast = new bootstrap.Toast(document.getElementById(toastId));
+    const toast = new bootstrap.Toast(document.getElementById(toastId), { delay: 3000 });
     toast.show();
-    
-    // Supprimer le toast après fermeture
-    document.getElementById(toastId).addEventListener('hidden.bs.toast', function() {
-        this.remove();
-    });
+    document.getElementById(toastId).addEventListener('hidden.bs.toast', function() { this.remove(); });
 } 

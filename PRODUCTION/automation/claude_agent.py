@@ -28,72 +28,35 @@ class ClaudeAgent:
     def __init__(self, api_key: Optional[str] = None, db_manager=None):
         """
         Initialise l'agent Claude
-        
-        Args:
-            api_key: Clé API Anthropic (ou via variable d'environnement)
-            db_manager: Gestionnaire de base de données pour contexte client
         """
+        print("🤖 [ClaudeAgent] Initialisation en cours...")
         self.db_manager = db_manager
+        self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY')
         self.client = None
         self.is_ready = False
         
-        # Configuration de l'API
-        self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY')
-        
         if not ANTHROPIC_AVAILABLE:
-            print("❌ Module anthropic non disponible")
+            print("❌ [ClaudeAgent] Librairie 'anthropic' non trouvée. Agent inactif.")
             return
-            
+
         if not self.api_key:
-            print("⚠️ Clé API Claude non configurée. Définissez ANTHROPIC_API_KEY")
+            print("❌ [ClaudeAgent] Clé API ANTHROPIC_API_KEY non trouvée. Agent inactif.")
             return
-            
+        
+        print("🔑 [ClaudeAgent] Clé API trouvée.")
+
         try:
             self.client = anthropic.Anthropic(api_key=self.api_key)
             self.is_ready = True
-            print("✅ Agent Claude initialisé avec succès")
+            print("✅ [ClaudeAgent] Initialisation réussie. Agent prêt.")
         except Exception as e:
-            print(f"❌ Erreur d'initialisation Claude: {e}")
-            # En cas d'erreur, utiliser le mode fallback
+            print(f"❌ [ClaudeAgent] ERREUR D'INITIALISATION : {e}")
             self.client = None
             self.is_ready = False
     
     def get_customer_context(self, email: str) -> Dict[str, Any]:
-        """Récupère le contexte client depuis la base de données"""
-        if not self.db_manager:
-            return {}
-            
-        try:
-            # Récupérer les informations client
-            client_info = self.db_manager.get_client_by_email(email)
-            if not client_info:
-                return {"status": "client_inconnu"}
-                
-            # Récupérer l'historique des commandes
-            orders = self.db_manager.get_orders_by_client_id(client_info[0])  # client_id
-            
-            return {
-                "client": {
-                    "id": client_info[0],
-                    "nom": client_info[1],
-                    "prenom": client_info[2], 
-                    "email": client_info[3],
-                    "type": client_info[4]
-                },
-                "commandes": [
-                    {
-                        "id": order[0],
-                        "date": order[2],
-                        "montant": order[3],
-                        "statut": order[4]
-                    } for order in orders
-                ],
-                "nb_commandes": len(orders),
-                "total_depense": sum(order[3] for order in orders) if orders else 0
-            }
-        except Exception as e:
-            print(f"Erreur récupération contexte: {e}")
-            return {}
+        """Récupère le contexte client depuis la base de données (DÉSACTIVÉ)"""
+        return {}
     
     def classify_message(self, message: str, subject: str = "", customer_context: Dict = None) -> Dict[str, Any]:
         """
@@ -154,18 +117,14 @@ Analyse ce message et fournis une classification JSON avec:
 
 Réponds uniquement avec le JSON, sans autres commentaires."""
 
-            # Appel à l'API Claude 4 avec chaîne de réflexion
+            # Appel à l'API Claude
             response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",  # Claude 4 Sonnet
-                max_tokens=2000,  # Augmenté pour la réflexion
+                model="claude-3-sonnet-20240229",
+                max_tokens=1024,
                 temperature=0.1,
                 messages=[
                     {"role": "user", "content": prompt}
-                ],
-                # Activation de la chaîne de réflexion (extended thinking)
-                extra_headers={
-                    "anthropic-beta": "thinking-2024-11-18"
-                }
+                ]
             )
             
             # Parser la réponse JSON
@@ -174,7 +133,7 @@ Réponds uniquement avec le JSON, sans autres commentaires."""
             # Ajouter des métadonnées
             result.update({
                 "processed_at": datetime.now().isoformat(),
-                "model": "claude-sonnet-4",
+                "model": "claude-3-sonnet-20240229",
                 "has_context": bool(customer_context and customer_context.get("client"))
             })
             
@@ -293,16 +252,12 @@ Génère maintenant une réponse UNIQUE et PERSONNALISÉE:"""
 
             # Appel à Claude 4 pour génération avec réflexion
             response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",  # Claude 4 Sonnet
-                max_tokens=3000,  # Augmenté pour les réponses détaillées
+                model="claude-3-5-sonnet-20240620",  # Remplacé par le dernier modèle Sonnet
+                max_tokens=3000,
                 temperature=0.3,
                 messages=[
                     {"role": "user", "content": prompt}
-                ],
-                # Activation de la chaîne de réflexion pour des réponses plus réfléchies
-                extra_headers={
-                    "anthropic-beta": "thinking-2024-11-18"
-                }
+                ]
             )
             
             return response.content[0].text.strip()
@@ -311,7 +266,7 @@ Génère maintenant une réponse UNIQUE et PERSONNALISÉE:"""
             print(f"Erreur génération réponse Claude: {e}")
             return self._fallback_response(classification.get("category", "autre"))
     
-    def process_customer_message(self, email: str, message: str, subject: str = "") -> Dict[str, Any]:
+    def process_customer_message(self, email: str, message: str, subject: str = "", context: Dict = None) -> Dict[str, Any]:
         """
         Traite complètement un message client avec Claude
         
@@ -319,13 +274,13 @@ Génère maintenant une réponse UNIQUE et PERSONNALISÉE:"""
             email: Email du client
             message: Message du client
             subject: Sujet du message
+            context: Contexte client (commandes, historique)
             
         Returns:
             Dict avec classification, réponse et métadonnées
         """
         try:
-            # 1. Récupérer le contexte client
-            customer_context = self.get_customer_context(email)
+            customer_context = context or {}
             
             # 2. Classifier le message
             classification = self.classify_message(message, subject, customer_context)
@@ -358,7 +313,7 @@ Génère maintenant une réponse UNIQUE et PERSONNALISÉE:"""
                 "ticket_id": ticket_id,
                 "processed_at": datetime.now().isoformat(),
                 "customer_context": customer_context,
-                "model": "claude-4-sonnet",
+                "model": "claude-3-sonnet-20240229",
                 "has_customer_data": bool(customer_context.get("client"))
             }
             
@@ -368,7 +323,7 @@ Génère maintenant une réponse UNIQUE et PERSONNALISÉE:"""
                 "email": email,
                 "error": str(e),
                 "processed_at": datetime.now().isoformat(),
-                "model": "claude-3-sonnet (erreur)"
+                "model": "claude-3-sonnet-20240229 (erreur)"
             }
     
     def _fallback_classification(self, message: str) -> Dict[str, Any]:
@@ -578,6 +533,6 @@ Kevin - Support Client"""
             "claude_available": ANTHROPIC_AVAILABLE,
             "claude_ready": self.is_ready,
             "api_key_configured": bool(self.api_key),
-            "model": "claude-sonnet-4-20250514" if self.is_ready else None,
+            "model": "claude-3-sonnet-20240229" if self.is_ready else None,
             "last_check": datetime.now().isoformat()
         } 

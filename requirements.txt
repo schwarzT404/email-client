@@ -7,22 +7,22 @@
 # SQLite est inclus avec Python (pas d'installation séparée nécessaire)
 
 # Intégration Notion
-notion-client>=2.2.1
+notion-client==2.2.0
 
 # Variables d'environnement
-python-dotenv>=1.1.1
+python-dotenv==1.0.1
 
 # Requêtes HTTP
 requests>=2.31.0
 
 # Interface web Flask
-Flask>=3.0.0
+Flask==3.0.0
 
 # Intelligence artificielle - OpenAI
 openai>=1.93.0
 
 # Intelligence artificielle - Anthropic Claude
-anthropic>=0.55.0
+anthropic>=0.29.0
 
 # ======================================
 # DÉPENDANCES OPTIONNELLES POUR DÉVELOPPEMENT
@@ -39,3 +39,6 @@ anthropic>=0.55.0
 # - langchain supprimé (non utilisé)
 # - Werkzeug inclus automatiquement avec Flask
 # ====================================== 
+
+# Added from the code block
+pytz==2024.1 
