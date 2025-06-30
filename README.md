@@ -35,7 +35,7 @@ venv\Scripts\activate  # Windows
 source venv/bin/activate  # Linux/Mac
 
 # Installer les dépendances
-pip install -r PRODUCTION/requirements.txt
+pip install -r requirements.txt
 
 # Configurer les variables d'environnement
 copy PRODUCTION\env.example PRODUCTION\.env
