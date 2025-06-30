@@ -5,7 +5,7 @@
 ### 🚀 **PRODUCTION** *(Versions finales et livrables)*
 ```
 PRODUCTION/
-├── 🚀 launcher_FINAL.py          # POINT D'ENTRÉE PRINCIPAL
+├── 🚀 launcher.py               # POINT D'ENTRÉE PRINCIPAL
 ├── 🔧 admin_interface_FINAL.py   # INTERFACE ADMIN FINALE
 ├── 🌐 web_app/                   # APPLICATION WEB COMPLÈTE
 ├── 🤖 automation/                # AGENTS IA (Claude + Support)
@@ -73,7 +73,7 @@ ADMIN/
 ### **🚀 LANCEMENT DU SYSTÈME**
 ```bash
 cd PRODUCTION
-python launcher_FINAL.py
+python launcher.py
 ```
 
 ### **🔧 INTERFACE ADMINISTRATEUR**
@@ -106,7 +106,7 @@ python bot_simulation_emails.py
 
 ### ✅ **PRINCIPE : DERNIÈRE MODIFICATION = VERSION OFFICIELLE**
 - `admin_interface_FINAL.py` *(30/06/2025 09:50)* = **VERSION DE RÉFÉRENCE**
-- `launcher_FINAL.py` *(26/06/2025 16:38)* = **LAUNCHER OFFICIEL**
+- `launcher.py` *(26/06/2025 16:38)* = **LAUNCHER OFFICIEL**
 - `web_app/` *(modifié 30/06/2025)* = **APPLICATION WEB FINALE**
 
 ### 🔄 **CYCLE DE DÉVELOPPEMENT**

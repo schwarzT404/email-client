@@ -14,7 +14,7 @@
 
 **VERS PRODUCTION :**
 - `admin_interface_ameliore.py` → `PRODUCTION/admin_interface_FINAL.py` *(VERSION OFFICIELLE)*
-- `lancer_systeme_complet.py` → `PRODUCTION/launcher_FINAL.py` *(POINT D'ENTRÉE)*
+- `lancer_systeme_complet.py` → `PRODUCTION/launcher.py` *(POINT D'ENTRÉE)*
 - `web_app/` → `PRODUCTION/web_app/` *(APPLICATION COMPLÈTE)*
 - `automation/` → `PRODUCTION/automation/` *(AGENTS IA)*
 - `database/` → `PRODUCTION/database/` *(GESTIONNAIRES BD)*
@@ -65,7 +65,7 @@
 ### ✅ **NAVIGATION FLUIDE**
 - **Temps d'accès** : <30 secondes pour tout fichier
 - **Chemin logique** : Structure reflète l'usage
-- **Points d'entrée clairs** : `PRODUCTION/launcher_FINAL.py`
+- **Points d'entrée clairs** : `PRODUCTION/launcher.py`
 
 ### ✅ **ZÉRO AMBIGUÏTÉ**
 - **Version unique** : Plus de doublons `admin_interface.py` vs `admin_interface_ameliore.py`
@@ -89,7 +89,7 @@
 ### **LANCER LE SYSTÈME**
 ```bash
 cd PRODUCTION
-python launcher_FINAL.py
+python launcher.py
 ```
 
 ### **DÉVELOPPER DE NOUVELLES FONCTIONNALITÉS**

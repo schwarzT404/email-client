@@ -55,7 +55,7 @@ DB_PATH=data/crm_ecommerce.db
 ```bash
 # Via le lanceur (recommandé)
 cd PRODUCTION
-python launcher_FINAL.py
+python launcher.py
 ```
 
 ### Lancement Manuel
